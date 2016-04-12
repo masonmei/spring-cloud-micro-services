@@ -10,10 +10,9 @@ import java.util.List;
 /**
  * Created by mason on 4/12/16.
  */
-@FeignClient(url = "http://localhost:8868")
-@RequestMapping("users/{username}/action")
+@FeignClient(name = "actionService", url = "http://localhost:8868")
 public interface ActionService {
 
-    @RequestMapping(method = RequestMethod.GET)
-    public List<String> actions(@PathVariable("username") String username);
+    @RequestMapping(value = "users/{name}/actions", method = RequestMethod.GET)
+    List<String> actions(@PathVariable("name") String username);
 }
