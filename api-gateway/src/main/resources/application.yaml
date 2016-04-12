@@ -1,0 +1,7 @@
+server:
+  port: 8888
+zuul:
+  routes:
+    actions:
+      path: /api/users/*/actions/**
+      url: http://localhost:8868/users

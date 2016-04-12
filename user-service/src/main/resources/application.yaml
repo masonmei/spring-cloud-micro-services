@@ -1,0 +1,8 @@
+server:
+  port: 8878
+spring:
+  jackson:
+    serialization-inclusion: non_null
+    serialization:
+      WRITE_DATES_AS_TIMESTAMPS: false
+
