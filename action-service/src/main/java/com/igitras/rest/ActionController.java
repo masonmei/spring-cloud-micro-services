@@ -19,7 +19,7 @@ public class ActionController {
     public List<String> search(
             @PathVariable("username")
                     String username) {
-        return Arrays.asList("Test", "DO");
+        return Arrays.asList("Test", "DO", username);
     }
 
 }
