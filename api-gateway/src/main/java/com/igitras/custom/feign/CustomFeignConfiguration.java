@@ -19,6 +19,10 @@ import org.springframework.cloud.netflix.feign.support.SpringMvcContract;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.ConversionService;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.security.Principal;
 
 /**
  * @author mason
@@ -45,6 +49,28 @@ public class CustomFeignConfiguration {
             @Override
             public void apply(RequestTemplate template) {
                 template.header("test-header", Application.th.get());
+            }
+        };
+    }
+
+    @Bean
+    public RequestInterceptor authHeaderInterceptor() {
+        return new RequestInterceptor() {
+            @Override
+            public void apply(RequestTemplate requestTemplate) {
+                SecurityContext context = SecurityContextHolder.getContext();
+                Object principal = context.getAuthentication().getPrincipal();
+                String username;
+                if(principal instanceof String){
+                    username = (String) principal;
+                } else if (principal instanceof Principal){
+                    Principal principal1 = (Principal) principal;
+                    username = principal1.getName();
+                } else {
+                    username = principal.toString();
+                }
+
+                requestTemplate.header("X-USERNAME", username);
             }
         };
     }
