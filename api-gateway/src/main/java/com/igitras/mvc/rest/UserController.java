@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.DeferredResult;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -32,7 +33,7 @@ public class UserController {
 
     @RequestMapping(method = RequestMethod.GET)
     public List<MergedResponse> search(@RequestHeader(value = "username", required = false) String username,
-            @RequestParam MultiValueMap<String, String> queryMap) {
+            @RequestParam MultiValueMap<String, String> queryMap, Principal principal) {
         DeferredResult<List<MergedResponse>> deferredResult = new DeferredResult<>();
 
 
@@ -48,6 +49,13 @@ public class UserController {
 
         return userService.find(name);
     }
+
+    @RequestMapping(value = "{name}/actions/{V1}/{V2}/{V3}/{V4}", method = RequestMethod.GET)
+    public List<String> longTestActions(@PathVariable("name") String name, @PathVariable("V1") String v1,
+            @PathVariable("V2") String v2, @PathVariable("V3") String v3, @PathVariable("V4") String v4) {
+        return actionService.actions(name);
+    }
+
 
     @RequestMapping(value = "{name}/actions", method = RequestMethod.GET)
     public List<String> findActions(@PathVariable("name") String name) {

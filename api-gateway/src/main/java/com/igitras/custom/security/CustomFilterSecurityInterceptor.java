@@ -1,19 +1,20 @@
 package com.igitras.custom.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpMethod;
+import org.springframework.expression.Expression;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.ParseException;
 import org.springframework.security.access.AccessDecisionManager;
 import org.springframework.security.access.AccessDecisionVoter;
 import org.springframework.security.access.ConfigAttribute;
 import org.springframework.security.access.SecurityConfig;
 import org.springframework.security.access.expression.SecurityExpressionHandler;
 import org.springframework.security.access.vote.AuthenticatedVoter;
+import org.springframework.security.access.vote.RoleVoter;
 import org.springframework.security.access.vote.UnanimousBased;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.web.FilterInvocation;
 import org.springframework.security.web.access.expression.DefaultWebSecurityExpressionHandler;
-import org.springframework.security.web.access.expression.ExpressionBasedFilterInvocationSecurityMetadataSource;
-import org.springframework.security.web.access.expression.WebExpressionVoter;
 import org.springframework.security.web.access.intercept.FilterInvocationSecurityMetadataSource;
 import org.springframework.security.web.access.intercept.FilterSecurityInterceptor;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -27,13 +28,21 @@ import java.util.List;
 import javax.annotation.PostConstruct;
 
 /**
- * Created by mason on 4/19/16.
+ * Custom Filter Security Interceptor with support authentication, role based, and request info bases Interceptor.
+ *
+ * @author mason
  */
 @Component
 public class CustomFilterSecurityInterceptor extends FilterSecurityInterceptor {
 
+    @Autowired(required = false)
+    private SecurityExpressionHandler<FilterInvocation> expressionHandler = new DefaultWebSecurityExpressionHandler();
+
     @Autowired
     private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private AuthorizeConfigService authorizeConfigService;
 
     @PostConstruct
     public void postConstruct() {
@@ -46,24 +55,40 @@ public class CustomFilterSecurityInterceptor extends FilterSecurityInterceptor {
     private AccessDecisionManager accessDecisionManager() {
         List<AccessDecisionVoter<? extends Object>> decisionVoters = new ArrayList<>();
         decisionVoters.add(new AuthenticatedVoter());
-        WebExpressionVoter voter = new WebExpressionVoter();
-        decisionVoters.add(voter);
+        decisionVoters.add(new CustomRequestInfoVoter());
+        decisionVoters.add(new RoleVoter());
+        CustomWebExpressionVoter expressionVoter = new CustomWebExpressionVoter();
+        expressionVoter.setExpressionHandler(expressionHandler);
+        decisionVoters.add(expressionVoter);
         return new UnanimousBased(decisionVoters);
     }
 
     private FilterInvocationSecurityMetadataSource securityMetadataSource() {
         LinkedHashMap<RequestMatcher, Collection<ConfigAttribute>> requestMap = loadFromDatabase();
-        SecurityExpressionHandler<FilterInvocation> expressionHandler = new DefaultWebSecurityExpressionHandler();
-        return new ExpressionBasedFilterInvocationSecurityMetadataSource(requestMap, expressionHandler);
+        return new CustomSecurityMetadataSource(requestMap);
     }
 
     private LinkedHashMap<RequestMatcher, Collection<ConfigAttribute>> loadFromDatabase() {
-        RequestMatcher requestMatcher = new AntPathRequestMatcher("/api/users/**", HttpMethod.GET.name(), false);
-
-        List<ConfigAttribute> list = SecurityConfig.createList("IN_PRODUCT");
-
         LinkedHashMap<RequestMatcher, Collection<ConfigAttribute>> configs = new LinkedHashMap<>();
-        configs.put(requestMatcher, list);
+        ExpressionParser parser = expressionHandler.getExpressionParser();
+        List<AuthorizeConfig> authorizeConfigs = authorizeConfigService.getAuthorizeConfigs();
+        authorizeConfigs.stream()
+                .forEach(authorizeConfig -> {
+                    RequestMatcher requestMatcher = new AntPathRequestMatcher(authorizeConfig.getPattern(),
+                            authorizeConfig.getHttpMethod()
+                                    .name(), authorizeConfig.isCaseSensitive());
+                    List<ConfigAttribute> attributeList = new ArrayList<>();
+                    attributeList.addAll(SecurityConfig.createList(authorizeConfig.getRequestAttribute()));
+
+                    try {
+                        attributeList.add(new CustomWebExpressionConfigAttribute(
+                                parser.parseExpression(authorizeConfig.getExpression())));
+                    } catch (ParseException e) {
+                        throw new IllegalArgumentException(
+                                "Failed to parse expression '" + authorizeConfig.getExpression() + "'");
+                    }
+                    configs.put(requestMatcher, attributeList);
+                });
         return configs;
     }
 }
